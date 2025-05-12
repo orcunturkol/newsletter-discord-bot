@@ -48,3 +48,6 @@ Thumbs.db
 !.yarn/sdks
 !.yarn/versions
 .pnp.*
+service-account-key.json
+
+yarn.lock
