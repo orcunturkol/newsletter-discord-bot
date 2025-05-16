@@ -15,14 +15,31 @@ export class GoogleSheetsClient {
    */
   async getSheetData(sheetName: string, range?: string): Promise<any[][]> {
     try {
-      const rangeDef = range ? `${sheetName}!${range}` : sheetName;
+      // When only sheetName is provided, default to sheetName!A1:Z100 for a reasonable default range
+      // This ensures we're using a valid range format for the API
+      const rangeDef = range ? `${sheetName}!${range}` : `${sheetName}!A1:Z100`;
+
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: rangeDef,
       });
 
       return response.data.values || [];
-    } catch (error) {
+    } catch (error: unknown) {
+      // Check if this is a "sheet not found" type error
+      const errorMessage = error instanceof Error ? error.message : String(error) || '';
+      const isSheetNotFound =
+        errorMessage.includes('not found') ||
+        errorMessage.includes('does not exist') ||
+        errorMessage.includes('Unable to parse range');
+
+      if (isSheetNotFound) {
+        console.warn(
+          `Sheet "${sheetName}" not found or not accessible. This might be expected if the sheet is being created.`,
+        );
+        return []; // Return empty array instead of throwing
+      }
+
       console.error('Error fetching sheet data:', error);
       throw new Error(`Failed to fetch data from sheet "${sheetName}": ${error}`);
     }
@@ -87,6 +104,33 @@ export class GoogleSheetsClient {
     } catch (error) {
       console.error('Error fetching sheets:', error);
       throw new Error(`Failed to fetch sheets: ${error}`);
+    }
+  }
+
+  /**
+   * Create a new sheet in the spreadsheet
+   * @param sheetName The name of the new sheet
+   */
+  async createSheet(sheetName: string): Promise<void> {
+    try {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: this.spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: sheetName,
+                },
+              },
+            },
+          ],
+        },
+      });
+      console.log(`Sheet "${sheetName}" created successfully.`);
+    } catch (error) {
+      console.error('Error creating sheet:', error);
+      throw new Error(`Failed to create sheet "${sheetName}": ${error}`);
     }
   }
 }
