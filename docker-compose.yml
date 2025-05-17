@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: newsletter-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-newsletter_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-newsletter_password}
+      POSTGRES_DB: ${POSTGRES_DB:-newsletter_db}
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - newsletter-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin for Database Management
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: newsletter-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      - newsletter-network
+    depends_on:
+      - postgres
+
+  # Newsletter Discord Bot
+  discord-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: newsletter-discord-bot
+    restart: unless-stopped
+    environment:
+      # Database connection
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-newsletter_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-newsletter_password}
+      DB_NAME: ${POSTGRES_DB:-newsletter_db}
+      
+      # Discord configuration
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      
+      # Email configuration
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_TLS: ${EMAIL_TLS}
+      EMAIL_MAILBOX: ${EMAIL_MAILBOX}
+      EMAIL_MARK_SEEN: ${EMAIL_MARK_SEEN}
+      
+      # Google Sheets configuration (still used for Newsletter tracking)
+      GOOGLE_SERVICE_ACCOUNT_KEY: ${GOOGLE_SERVICE_ACCOUNT_KEY}
+      GOOGLE_SHEET_ID: ${GOOGLE_SHEET_ID}
+      
+      # Other configurations
+      NODE_ENV: production
+      TZ: America/New_York
+    volumes:
+      # Mount Google service account key if it's a file
+      - ${GOOGLE_KEY_PATH:-./service-account.json}:/app/service-account.json:ro
+      # For logging
+      - ./logs:/app/logs
+    networks:
+      - newsletter-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  newsletter-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: newsletter_postgres_data
+  pgadmin_data:
+    name: newsletter_pgadmin_data

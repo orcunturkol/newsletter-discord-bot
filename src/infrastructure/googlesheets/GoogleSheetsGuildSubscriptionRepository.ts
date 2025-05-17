@@ -115,15 +115,28 @@ export class GoogleSheetsGuildSubscriptionRepository implements IGuildSubscripti
    * Find active subscriptions by newsletter ID
    */
   async getActiveByNewsletterId(newsletterId: string): Promise<GuildSubscription[]> {
-    if (!newsletterId) {
-      throw new Error('Newsletter ID is required');
+    try {
+      const allSubscriptions = await this.getAll();
+
+      // Add logging to see what's coming back
+      console.log(
+        'All subscriptions:',
+        allSubscriptions.map((s) => ({
+          id: s.id,
+          newsletterId: s.newsletterId,
+          active: s.active,
+        })),
+      );
+
+      // Filter for active subscriptions matching this newsletter
+      return allSubscriptions.filter(
+        (subscription) =>
+          subscription.newsletterId === newsletterId && subscription.active === true,
+      );
+    } catch (error) {
+      console.error(`Error getting active subscriptions for newsletter ${newsletterId}:`, error);
+      return [];
     }
-
-    await this.refreshCacheIfNeeded();
-
-    return Array.from(this.cache.values()).filter(
-      (sub) => sub.newsletterId === newsletterId && sub.active,
-    );
   }
 
   /**
@@ -294,13 +307,13 @@ export class GoogleSheetsGuildSubscriptionRepository implements IGuildSubscripti
    */
   private rowToSubscription(row: string[]): GuildSubscription {
     const obj = mapRowToObject(row, this.headerRow);
-
+    const active = String(row[4]).toUpperCase() === 'TRUE';
     return GuildSubscription.create({
       id: obj.ID,
       guildId: obj.GuildID,
       channelId: obj.ChannelID,
       newsletterId: obj.NewsletterID,
-      active: obj.Active === 'true', // Convert string to boolean
+      active: active, // Convert string to boolean
     });
   }
 

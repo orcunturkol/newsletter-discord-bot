@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Enhanced processNewsletters.ts
 async function processNewsletters() {
   try {
     console.log('Starting manual newsletter processing...');
@@ -23,10 +24,15 @@ async function processNewsletters() {
     console.log(`Issues extracted: ${result.extractedIssues}`);
     console.log(`Errors: ${result.errors.length}`);
 
+    if (result.totalEmails === 0 && result.errors.length === 0) {
+      console.log('\nNo emails were processed. This could indicate:');
+      console.log('1. No new emails in the inbox');
+      console.log('2. Issues connecting to the mail server');
+      console.log('3. Emails were fetched but not processed correctly');
+    }
+
     if (result.extractedIssues > 0) {
       console.log('\nSUCCESSFUL ISSUES:');
-      // Since we don't have the actual issues here, we'd need to fetch them
-      // This is simplified output
       console.log(`  Extracted ${result.extractedIssues} issues successfully`);
     }
 

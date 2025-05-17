@@ -9,6 +9,10 @@ import { EmailServiceFactory } from './emailServiceFactory';
 import { IIssueRepository, IMailService } from '../../application/ports';
 import { PullInboxUseCase } from '../../application/usecases/PullInboxUseCase';
 import { GoogleSheetsIssueRepository } from '../googlesheets/GoogleSheetsIssueRepository';
+import { DiscordClient } from '../discord/DiscordClient';
+import { DiscordServiceFactory } from './discordServiceFactory';
+import { DispatchIssueUseCase } from '../../application/usecases/DispatchIssueUseCase';
+import { HandleDiscordCommandsUseCase } from '../../application/usecases/HandleDiscordCommandsUseCase';
 
 /**
  * Factory for creating repositories and services
@@ -20,6 +24,7 @@ export class RepositoryFactory {
   private static newsletterService: NewsletterService | null = null;
   private static guildSubscriptionService: GuildSubscriptionService | null = null;
   private static issueRepository: IIssueRepository | null = null;
+  private static handleDiscordCommandsUseCase: HandleDiscordCommandsUseCase | null = null;
 
   /**
    * Get the Google Sheets client instance
@@ -115,6 +120,39 @@ export class RepositoryFactory {
   }
 
   /**
+   * Get the Discord client instance
+   */
+  static async getDiscordClient(): Promise<DiscordClient> {
+    return DiscordServiceFactory.getDiscordClient();
+  }
+  /**
+   * Get the HandleDiscordCommandsUseCase instance
+   */
+  static async getHandleDiscordCommandsUseCase(): Promise<HandleDiscordCommandsUseCase> {
+    if (!this.handleDiscordCommandsUseCase) {
+      const guildSubscriptionRepository = await this.getGuildSubscriptionRepository();
+      const newsletterRepository = await this.getNewsletterRepository();
+
+      this.handleDiscordCommandsUseCase = new HandleDiscordCommandsUseCase(
+        guildSubscriptionRepository,
+        newsletterRepository,
+      );
+    }
+
+    return this.handleDiscordCommandsUseCase;
+  }
+  /**
+   * Get the DispatchIssueUseCase instance
+   */
+  static async getDispatchIssueUseCase(): Promise<DispatchIssueUseCase> {
+    const issueRepository = await this.getIssueRepository();
+    const guildSubscriptionRepository = await this.getGuildSubscriptionRepository();
+    const discordClient = await this.getDiscordClient();
+
+    return new DispatchIssueUseCase(issueRepository, guildSubscriptionRepository, discordClient);
+  }
+
+  /**
    * Reset all instances (useful for testing)
    */
   static reset(): void {
@@ -125,5 +163,7 @@ export class RepositoryFactory {
     this.newsletterService = null;
     this.guildSubscriptionService = null;
     EmailServiceFactory.reset();
+    DiscordServiceFactory.reset();
+    this.handleDiscordCommandsUseCase = null;
   }
 }
